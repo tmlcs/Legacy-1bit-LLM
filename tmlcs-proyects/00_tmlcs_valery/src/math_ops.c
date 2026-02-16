@@ -191,8 +191,17 @@ void add_vector_inplace(float* vec1, const float* vec2, int size) {
 #ifdef USE_SSE
 // SSE-optimized add_scalar_mul_vector_inplace
 void add_scalar_mul_vector_inplace(float* vec1, float scalar, const float* vec2, int size) {
-    // Placeholder: call non-SSE version
-    for (int i = 0; i < size; ++i) {
+    __m128 s_vec = _mm_set1_ps(scalar); // Splat scalar into all 4 floats of an SSE register
+    int i;
+    for (i = 0; i + 3 < size; i += 4) {
+        __m128 v1 = _mm_loadu_ps(&vec1[i]); // Load 4 floats from vec1
+        __m128 v2 = _mm_loadu_ps(&vec2[i]); // Load 4 floats from vec2
+        __m128 product = _mm_mul_ps(s_vec, v2); // scalar * vec2[i]
+        __m128 result = _mm_add_ps(v1, product); // vec1[i] += product
+        _mm_storeu_ps(&vec1[i], result);       // Store result back to vec1
+    }
+    // Handle remaining elements (if size is not a multiple of 4)
+    for (; i < size; ++i) {
         vec1[i] += scalar * vec2[i];
     }
 }
@@ -231,17 +240,45 @@ void multiply_vector_inplace(float* vec1, const float* vec2, int size) {
 #ifdef USE_SSE
 // SSE-optimized vector_pow_scalar_inplace
 void vector_pow_scalar_inplace(float* vec, float scalar, int size) {
-    // Placeholder: call non-SSE version
-    for (int i = 0; i < size; ++i) {
-        vec[i] = powf(vec[i], scalar);
+    START_TIMER(vector_pow_scalar_inplace_sse);
+    if (scalar == 2.0f) { // Optimized for squaring
+        __m128 v_vec;
+        int i;
+        for (i = 0; i + 3 < size; i += 4) {
+            v_vec = _mm_loadu_ps(&vec[i]);
+            v_vec = _mm_mul_ps(v_vec, v_vec); // v*v for squaring
+            _mm_storeu_ps(&vec[i], v_vec);
+        }
+        for (; i < size; ++i) {
+            vec[i] *= vec[i]; // Scalar tail for squaring
+        }
+    } else if (scalar == 0.5f) { // Optimized for square root
+        __m128 v_vec;
+        int i;
+        for (i = 0; i + 3 < size; i += 4) {
+            v_vec = _mm_loadu_ps(&vec[i]);
+            v_vec = _mm_sqrt_ps(v_vec); // sqrt
+            _mm_storeu_ps(&vec[i], v_vec);
+        }
+        for (; i < size; ++i) {
+            vec[i] = sqrtf(vec[i]); // Scalar tail for sqrt
+        }
     }
+    else { // Fallback to non-SSE version for general powers
+        for (int i = 0; i < size; ++i) {
+            vec[i] = powf(vec[i], scalar);
+        }
+    }
+    STOP_TIMER(vector_pow_scalar_inplace_sse, "vector_pow_scalar_inplace_sse");
 }
 #else
 // Non-SSE vector_pow_scalar_inplace
 void vector_pow_scalar_inplace(float* vec, float scalar, int size) {
+    START_TIMER(vector_pow_scalar_inplace_non_sse);
     for (int i = 0; i < size; ++i) {
         vec[i] = powf(vec[i], scalar);
     }
+    STOP_TIMER(vector_pow_scalar_inplace_non_sse, "vector_pow_scalar_inplace_non_sse");
 }
 #endif // USE_SSE
 
@@ -353,21 +390,34 @@ float vector_sum(const float* vec, int size) {
 #ifdef USE_SSE
 // SSE-optimized outer_product_add_inplace
 void outer_product_add_inplace(float* matrix_grad, const float* vec1, const float* vec2, int rows, int cols) {
-    // Placeholder: call non-SSE version
+    START_TIMER(outer_product_add_inplace_sse);
     for (int i = 0; i < rows; ++i) {
-        for (int j = 0; j < cols; ++j) {
+        __m128 val1_splat = _mm_set1_ps(vec1[i]); // Splat vec1[i] across SSE register
+        int j;
+        for (j = 0; j + 3 < cols; j += 4) {
+            __m128 m_grad_vec = _mm_loadu_ps(&matrix_grad[i * cols + j]); // Load 4 floats from matrix_grad
+            __m128 vec2_vec = _mm_loadu_ps(&vec2[j]);                     // Load 4 floats from vec2
+            __m128 product = _mm_mul_ps(val1_splat, vec2_vec);          // vec1[i] * vec2[j...j+3]
+            __m128 result = _mm_add_ps(m_grad_vec, product);              // matrix_grad[idx] += product
+            _mm_storeu_ps(&matrix_grad[i * cols + j], result);            // Store result back
+        }
+        // Handle remaining elements (tail processing)
+        for (; j < cols; ++j) {
             matrix_grad[i * cols + j] += vec1[i] * vec2[j];
         }
     }
+    STOP_TIMER(outer_product_add_inplace_sse, "outer_product_add_inplace_sse");
 }
 #else
 // Non-SSE outer_product_add_inplace
 void outer_product_add_inplace(float* matrix_grad, const float* vec1, const float* vec2, int rows, int cols) {
+    START_TIMER(outer_product_add_inplace_non_sse);
     for (int i = 0; i < rows; ++i) {
         for (int j = 0; j < cols; ++j) {
             matrix_grad[i * cols + j] += vec1[i] * vec2[j];
         }
     }
+    STOP_TIMER(outer_product_add_inplace_non_sse, "outer_product_add_inplace_non_sse");
 }
 #endif // USE_SSE
 

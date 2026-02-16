@@ -10,7 +10,6 @@
 #include "math_ops.h"
 #include "forward.h"
 #include "backward.h"
-#include "test_llm.h" // Include test functions
 
 #define LEARNING_RATE 0.01f
 #define NUM_EPOCHS 10
@@ -22,11 +21,6 @@ int main() {
     printf("Legacy-1bit LLM Project\n");
 
     START_TIMER(total_training_time); // Add this line
-
-    // Optionally run tests
-    printf("Running tests...\n");
-    run_all_llm_tests();
-    printf("Tests finished.\n");
 
     printf("\nStarting training loop...\n");
 
