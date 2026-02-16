@@ -1,5 +1,0 @@
-build/
-llm_model.bin
-*.o
-*.txt
-.gemini/
