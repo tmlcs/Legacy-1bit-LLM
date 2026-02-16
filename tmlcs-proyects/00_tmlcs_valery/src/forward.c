@@ -503,9 +503,23 @@ float* forward_llm_batch(LegacyLLM* model, const int* input_batch, int batch_siz
     // 3. Final Output Layer (Unembedding + Bias)
     float* output_probs_batch = forward_output_layer_batch(&model->output, hidden_state_batch, batch_size, model->model_dim, model->vocab_size);
     free_float_array(hidden_state_batch); // Free final hidden_state_batch
-    if (!output_probs_batch) return NULL;
-
     return output_probs_batch; // Return probabilities
+}
+
+// Full forward pass through the LLM for a single token
+float* forward_llm(LegacyLLM* model, int token_id) {
+    if (!model) {
+        fprintf(stderr, "Error: Invalid input to forward_llm\n");
+        return NULL;
+    }
+    
+    // Create a single-element batch for input token
+    int input_batch_single[1] = {token_id};
+    
+    // Call the batched version with batch_size = 1
+    float* output_probs = forward_llm_batch(model, input_batch_single, 1);
+
+    return output_probs; // Return probabilities
 }
 
 // Forward pass for the Output Layer (Batched version)

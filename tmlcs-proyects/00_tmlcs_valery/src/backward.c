@@ -799,7 +799,346 @@ void backward_llm_batch(LegacyLLM* model, const int* input_batch, const int* tar
         d_loss_d_hidden_state_batch = d_loss_d_block_input_batch;
     }
 
-    // 4. Backward pass through Embedding Layer (Batched)
-    backward_embedding_batch(&model->embedding, input_batch, d_loss_d_hidden_state_batch, batch_size, model->model_dim, grads);
-    free_float_array(d_loss_d_hidden_state_batch); // Free final d_loss_d_hidden_state_batch
-}
+        // 4. Backward pass through Embedding Layer (Batched)
+
+        backward_embedding_batch(&model->embedding, input_batch, d_loss_d_hidden_state_batch, batch_size, model->model_dim, grads);
+
+        free_float_array(d_loss_d_hidden_state_batch); // Free final d_loss_d_hidden_state_batch
+
+    }
+
+    
+
+    // Full backward pass through the LLM for a single token
+
+    void backward_llm(LegacyLLM* model, int input_token_id, int target_token_id, LegacyLLM_Gradients* grads) {
+
+        if (!model || !grads) {
+
+            fprintf(stderr, "Error: Invalid input to backward_llm\n");
+
+            return;
+
+        }
+
+    
+
+        // Create single-element batches for input and target tokens
+
+        int input_batch_single[1] = {input_token_id};
+
+        int target_batch_single[1] = {target_token_id};
+
+    
+
+        // Call the batched version with batch_size = 1
+
+        backward_llm_batch(model, input_batch_single, target_batch_single, 1, grads);
+
+    }
+
+    
+
+    // Backward pass for a Transformer Block (Batched version)
+
+    float* backward_transformer_block_batch(const TransformerBlock* block, const float* d_loss_d_block_output_batch, int batch_size, int model_dim, int block_idx, LegacyLLM_Gradients* grads, const TransformerBlockContext* context) {
+
+        if (!block || !d_loss_d_block_output_batch || !context || !grads || block_idx < 0 || block_idx >= grads->num_transformer_blocks) {
+
+            fprintf(stderr, "Error: Invalid input to backward_transformer_block_batch\n");
+
+            return NULL;
+
+        }
+
+    
+
+        float* d_loss_d_block_input_batch = create_float_array(batch_size * model_dim);
+
+        if (!d_loss_d_block_input_batch) return NULL;
+
+    
+
+        for (int b = 0; b < batch_size; ++b) {
+
+            // Extract single item data for current batch
+
+            const float* d_loss_d_block_output_single = &d_loss_d_block_output_batch[b * model_dim];
+
+            const float* block_input_single = &context->block_input_batch[b * model_dim];
+
+            float mean_ln1 = context->ln1_mean_batch[b];
+
+            float inv_std_dev_ln1 = context->ln1_inv_std_dev_batch[b];
+
+            float mean_ln2 = context->ln2_mean_batch[b];
+
+            float inv_std_dev_ln2 = context->ln2_inv_std_dev_batch[b];
+
+            float* d_loss_d_block_input_single = &d_loss_d_block_input_batch[b * model_dim];
+
+    
+
+            // Recompute forward pass intermediates for this single item
+
+            // This recomputes the necessary values on-the-fly for the current batch item.
+
+            // This is essentially repeating the logic from backward_transformer_block for a single item,
+
+            // but carefully managing memory and pointers for the batch.
+
+    
+
+            // --- Recompute forward pass intermediates ---
+
+            // input_vec_LN1 is block_input_single
+
+            float* norm1_output_buffer_recomputed = create_float_array(model_dim);
+
+            if (!norm1_output_buffer_recomputed) { free_float_array(d_loss_d_block_input_batch); return NULL; }
+
+            memcpy(norm1_output_buffer_recomputed, block_input_single, model_dim * sizeof(float));
+
+            float temp_ln1_mean, temp_ln1_inv_std_dev; // dummy
+
+            layer_norm_forward(norm1_output_buffer_recomputed, block->norm1_gamma, block->norm1_beta, model_dim, 1e-5f, &temp_ln1_mean, &temp_ln1_inv_std_dev);
+
+    
+
+            float* attn_output_recomputed = forward_multi_head_attention(&block->attention, norm1_output_buffer_recomputed, model_dim);
+
+            if (!attn_output_recomputed) { free_float_array(norm1_output_buffer_recomputed); free_float_array(d_loss_d_block_input_batch); return NULL; }
+
+            
+
+            float* current_output_after_attn_residual_recomputed = create_float_array(model_dim);
+
+            if (!current_output_after_attn_residual_recomputed) { 
+
+                free_float_array(norm1_output_buffer_recomputed); free_float_array(attn_output_recomputed); free_float_array(d_loss_d_block_input_batch); return NULL; 
+
+            }
+
+            memcpy(current_output_after_attn_residual_recomputed, block_input_single, model_dim * sizeof(float));
+
+            add_vector_inplace(current_output_after_attn_residual_recomputed, attn_output_recomputed, model_dim);
+
+    
+
+            float* norm2_output_buffer_recomputed = create_float_array(model_dim);
+
+            if (!norm2_output_buffer_recomputed) {
+
+                free_float_array(norm1_output_buffer_recomputed); free_float_array(attn_output_recomputed); free_float_array(current_output_after_attn_residual_recomputed); free_float_array(d_loss_d_block_input_batch); return NULL;
+
+            }
+
+            memcpy(norm2_output_buffer_recomputed, current_output_after_attn_residual_recomputed, model_dim * sizeof(float));
+
+            float temp_ln2_mean, temp_ln2_inv_std_dev; // dummy
+
+            layer_norm_forward(norm2_output_buffer_recomputed, block->norm2_gamma, block->norm2_beta, model_dim, 1e-5f, &temp_ln2_mean, &temp_ln2_inv_std_dev);
+
+    
+
+            float* ffn_output_recomputed = forward_feed_forward(&block->ffn, norm2_output_buffer_recomputed, model_dim);
+
+            if (!ffn_output_recomputed) {
+
+                free_float_array(norm1_output_buffer_recomputed); free_float_array(attn_output_recomputed); free_float_array(current_output_after_attn_residual_recomputed); free_float_array(norm2_output_buffer_recomputed); free_float_array(d_loss_d_block_input_batch); return NULL;
+
+            }
+
+            
+
+            // --- Start Backward Pass for this single item ---
+
+            float* d_loss_d_current_output = create_float_array(model_dim);
+
+            if (!d_loss_d_current_output) {
+
+                free_float_array(norm1_output_buffer_recomputed); free_float_array(attn_output_recomputed); free_float_array(current_output_after_attn_residual_recomputed); free_float_array(norm2_output_buffer_recomputed); free_float_array(ffn_output_recomputed); free_float_array(d_loss_d_block_input_batch); return NULL;
+
+            }
+
+            memcpy(d_loss_d_current_output, d_loss_d_block_output_single, model_dim * sizeof(float));
+
+    
+
+            // Gradients for FFN (and its residual connection)
+
+            float* d_loss_d_ffn_output_for_ffn_back = create_float_array(model_dim);
+
+            if (!d_loss_d_ffn_output_for_ffn_back) { free_float_array(d_loss_d_current_output); free_float_array(d_loss_d_block_input_batch); return NULL; }
+
+            memcpy(d_loss_d_ffn_output_for_ffn_back, d_loss_d_current_output, model_dim * sizeof(float));
+
+            
+
+            float* ffn_input_recomputed_single = norm2_output_buffer_recomputed;
+
+            float* hidden_pre_relu_output_recomputed_single = create_float_array(model_dim * FFN_DIM_MULTIPLIER);
+
+            if (!hidden_pre_relu_output_recomputed_single) {
+
+                free_float_array(d_loss_d_ffn_output_for_ffn_back); free_float_array(d_loss_d_current_output); free_float_array(d_loss_d_block_input_batch); return NULL;
+
+            }
+
+            ternary_matrix_vector_mul(&block->ffn.Wi, ffn_input_recomputed_single, hidden_pre_relu_output_recomputed_single);
+
+            add_vector_inplace(hidden_pre_relu_output_recomputed_single, block->ffn.bi, model_dim * FFN_DIM_MULTIPLIER);
+
+    
+
+            float* d_loss_d_norm2_output = backward_feed_forward(&block->ffn, d_loss_d_ffn_output_for_ffn_back, ffn_input_recomputed_single, hidden_pre_relu_output_recomputed_single, model_dim, block_idx, grads);
+
+            free_float_array(d_loss_d_ffn_output_for_ffn_back);
+
+            free_float_array(hidden_pre_relu_output_recomputed_single);
+
+            if (!d_loss_d_norm2_output) { free_float_array(d_loss_d_current_output); free_float_array(d_loss_d_block_input_batch); return NULL; }
+
+    
+
+            add_vector_inplace(d_loss_d_current_output, d_loss_d_norm2_output, model_dim);
+
+            free_float_array(d_loss_d_norm2_output);
+
+            
+
+            float* d_loss_d_block_output_before_ffn_residual = backward_layer_norm(d_loss_d_current_output, current_output_after_attn_residual_recomputed, block->norm2_gamma, block->norm2_beta, mean_ln2, inv_std_dev_ln2, model_dim, block_idx, 2, grads);
+
+            free_float_array(d_loss_d_current_output);
+
+            if (!d_loss_d_block_output_before_ffn_residual) { free_float_array(d_loss_d_block_input_batch); return NULL; }
+
+    
+
+            // Gradients for MHA (and its residual connection)
+
+            float* d_loss_d_attn_output_for_mha_back = create_float_array(model_dim);
+
+            if (!d_loss_d_attn_output_for_mha_back) { free_float_array(d_loss_d_block_output_before_ffn_residual); free_float_array(d_loss_d_block_input_batch); return NULL; }
+
+            memcpy(d_loss_d_attn_output_for_mha_back, d_loss_d_block_output_before_ffn_residual, model_dim * sizeof(float));
+
+    
+
+            float* mha_input_recomputed_single = norm1_output_buffer_recomputed;
+
+    
+
+            float* recomputed_query_vec_pre_bias = create_float_array(model_dim);
+
+            float* recomputed_key_vec_pre_bias = create_float_array(model_dim);
+
+            float* recomputed_value_vec_pre_bias = create_float_array(model_dim);
+
+            float* recomputed_query_vec = create_float_array(model_dim);
+
+            float* recomputed_key_vec = create_float_array(model_dim);
+
+            float* recomputed_value_vec = create_float_array(model_dim);
+
+            float* recomputed_attention_output_vec = create_float_array(model_dim);
+
+    
+
+            if (!recomputed_query_vec_pre_bias || !recomputed_key_vec_pre_bias || !recomputed_value_vec_pre_bias ||
+
+                !recomputed_query_vec || !recomputed_key_vec || !recomputed_value_vec || !recomputed_attention_output_vec) {
+
+                // Cascading free for error handling
+
+                free_float_array(recomputed_query_vec_pre_bias); free_float_array(recomputed_key_vec_pre_bias); free_float_array(recomputed_value_vec_pre_bias);
+
+                free_float_array(recomputed_query_vec); free_float_array(recomputed_key_vec); free_float_array(recomputed_value_vec); free_float_array(recomputed_attention_output_vec);
+
+                free_float_array(d_loss_d_attn_output_for_mha_back); free_float_array(d_loss_d_block_output_before_ffn_residual); free_float_array(d_loss_d_block_input_batch); return NULL;
+
+            }
+
+    
+
+            ternary_matrix_vector_mul(&block->attention.Wq, mha_input_recomputed_single, recomputed_query_vec_pre_bias);
+
+            memcpy(recomputed_query_vec, recomputed_query_vec_pre_bias, model_dim * sizeof(float));
+
+            add_vector_inplace(recomputed_query_vec, block->attention.bq, model_dim);
+
+    
+
+            ternary_matrix_vector_mul(&block->attention.Wk, mha_input_recomputed_single, recomputed_key_vec_pre_bias);
+
+            memcpy(recomputed_key_vec, recomputed_key_vec_pre_bias, model_dim * sizeof(float));
+
+            add_vector_inplace(recomputed_key_vec, block->attention.bk, model_dim);
+
+    
+
+            ternary_matrix_vector_mul(&block->attention.Wv, mha_input_recomputed_single, recomputed_value_vec_pre_bias);
+
+            memcpy(recomputed_value_vec, recomputed_value_vec_pre_bias, model_dim * sizeof(float));
+
+            add_vector_inplace(recomputed_value_vec, block->attention.bv, model_dim);
+
+    
+
+            memcpy(recomputed_attention_output_vec, recomputed_value_vec, model_dim * sizeof(float));
+
+    
+
+            float* d_loss_d_norm1_output = backward_multi_head_attention(&block->attention, d_loss_d_attn_output_for_mha_back, mha_input_recomputed_single, 
+
+                                                                        recomputed_query_vec_pre_bias, recomputed_key_vec_pre_bias, recomputed_value_vec_pre_bias,
+
+                                                                        recomputed_query_vec, recomputed_key_vec, recomputed_value_vec, recomputed_attention_output_vec,
+
+                                                                        model_dim, block_idx, grads);
+
+            free_float_array(d_loss_d_attn_output_for_mha_back);
+
+            free_float_array(recomputed_query_vec_pre_bias); free_float_array(recomputed_key_vec_pre_bias); free_float_array(recomputed_value_vec_pre_bias);
+
+            free_float_array(recomputed_query_vec); free_float_array(recomputed_key_vec); free_float_array(recomputed_value_vec); free_float_array(recomputed_attention_output_vec);
+
+    
+
+            if (!d_loss_d_norm1_output) { free_float_array(d_loss_d_block_output_before_ffn_residual); free_float_array(d_loss_d_block_input_batch); return NULL; }
+
+            
+
+            add_vector_inplace(d_loss_d_block_output_before_ffn_residual, d_loss_d_norm1_output, model_dim);
+
+            free_float_array(d_loss_d_norm1_output);
+
+    
+
+            float* d_loss_d_block_input_final = backward_layer_norm(d_loss_d_block_output_before_ffn_residual, block_input_single, block->norm1_gamma, block->norm1_beta, mean_ln1, inv_std_dev_ln1, model_dim, block_idx, 1, grads);
+
+            free_float_array(d_loss_d_block_output_before_ffn_residual);
+
+    
+
+            free_float_array(norm1_output_buffer_recomputed); free_float_array(attn_output_recomputed); free_float_array(current_output_after_attn_residual_recomputed);
+
+            free_float_array(norm2_output_buffer_recomputed); free_float_array(ffn_output_recomputed);
+
+            
+
+            if (!d_loss_d_block_input_final) { free_float_array(d_loss_d_block_input_batch); return NULL; }
+
+            memcpy(d_loss_d_block_input_single, d_loss_d_block_input_final, model_dim * sizeof(float));
+
+            free_float_array(d_loss_d_block_input_final);
+
+        }
+
+    
+
+        return d_loss_d_block_input_batch;
+
+    }
+
+    
