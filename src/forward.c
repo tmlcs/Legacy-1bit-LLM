@@ -29,32 +29,46 @@ float* forward_embedding(const EmbeddingLayer* layer, int token_id, int model_di
 }
 
 // Forward pass for Embedding Layer (Batched version)
+// This function computes the embeddings for a batch of token IDs.
+// It iterates through each token in the input batch, retrieves its corresponding
+// embedding vector from the embedding weights matrix, and converts the ternary
+// weights (-1, 0, 1) to floating-point representation. Padding tokens (PAD_TOKEN)
+// are explicitly handled by producing all-zero embedding vectors, ensuring they
+// do not contribute to subsequent computations.
+//
 // input_batch: an array of token_ids of size batch_size
-// Returns: a flat array of embeddings (batch_size * model_dim), caller must free.
+// Returns: a flattened array of embeddings (batch_size * model_dim), caller must free.
 float* forward_embedding_batch(const EmbeddingLayer* layer, const int* input_batch, int batch_size, int model_dim) {
     if (!layer || !layer->embedding_weights.data || !input_batch) {
         fprintf(stderr, "Error: Invalid input to forward_embedding_batch\n");
         return NULL;
     }
 
+    // Allocate memory for the output batch of embeddings.
+    // This will be a flattened array where embeddings for each token are concatenated.
     float* embeddings_batch = create_float_array(batch_size * model_dim);
     if (!embeddings_batch) {
         return NULL;
     }
 
+    // Process each token in the batch
     for (int b = 0; b < batch_size; ++b) {
         int token_id = input_batch[b];
-        // Handle PAD_TOKEN: If it's a PAD_TOKEN, set embedding to zeros
+        // Handle PAD_TOKEN: If the current token is a padding token, its embedding is a vector of zeros.
+        // This prevents padding tokens from influencing the model's output.
         if (token_id == PAD_TOKEN) {
             for (int i = 0; i < model_dim; ++i) {
                 embeddings_batch[b * model_dim + i] = 0.0f;
             }
         } else if (token_id < 0 || token_id >= layer->embedding_weights.rows) {
+            // Error handling for invalid token IDs, ensuring memory is freed before returning.
             fprintf(stderr, "Error: Invalid token_id %d in batch at index %d for forward_embedding_batch\n", token_id, b);
             free_float_array(embeddings_batch);
             return NULL;
         } else {
-            // Embedding lookup for valid tokens
+            // For valid tokens, perform an embedding lookup.
+            // The embedding vector is a row in the embedding_weights matrix corresponding to the token_id.
+            // Ternary (int8_t) weights are converted to float.
             for (int i = 0; i < model_dim; ++i) {
                 embeddings_batch[b * model_dim + i] = (float)layer->embedding_weights.data[token_id * model_dim + i];
             }
@@ -118,122 +132,82 @@ float* forward_multi_head_attention(const MultiHeadAttentionLayer* layer, const 
     
 
     // Forward pass for Multi-Head Attention for a batch of input vectors
-
-    // input_batch: a flattened array of input vectors (batch_size * model_dim)
-
-    // Returns: a flattened array of output vectors (batch_size * model_dim), caller must free.
-
-    float* forward_multi_head_attention_batch(const MultiHeadAttentionLayer* layer, const float* input_batch, int batch_size, int model_dim) {
-
-        if (!layer || !input_batch) {
-
-            fprintf(stderr, "Error: Invalid input to forward_multi_head_attention_batch\n");
-
-            return NULL;
-
-        }
-
-    
-
-        float* output_batch = create_float_array(batch_size * model_dim);
-
-        if (!output_batch) {
-
-            fprintf(stderr, "Error: Memory allocation failed for MHA output batch\n");
-
-            return NULL;
-
-        }
-
-    
-
-        for (int b = 0; b < batch_size; ++b) {
-
-            const float* input_vec = &input_batch[b * model_dim];
-
-            float* current_output_vec = &output_batch[b * model_dim];
-
-    
-
-            float* query_vec = create_float_array(model_dim);
-
-            float* key_vec = create_float_array(model_dim);
-
-            float* value_vec = create_float_array(model_dim);
-
-            float* attention_output_vec = create_float_array(model_dim); // Output before final projection
-
-    
-
-            if (!query_vec || !key_vec || !value_vec || !attention_output_vec) {
-
-                free_float_array(query_vec); free_float_array(key_vec); free_float_array(value_vec); free_float_array(attention_output_vec);
-
-                free_float_array(output_batch);
-
-                fprintf(stderr, "Error: Memory allocation failed in forward_multi_head_attention_batch for intermediate vectors\n");
-
-                return NULL;
-
-            }
-
-    
-
-            // 1. Linear Projections for Q, K, V
-
-            ternary_matrix_vector_mul(&layer->Wq, input_vec, query_vec);
-
-            add_vector_inplace(query_vec, layer->bq, model_dim);
-
-    
-
-            ternary_matrix_vector_mul(&layer->Wk, input_vec, key_vec);
-
-            add_vector_inplace(key_vec, layer->bk, model_dim);
-
-    
-
-            ternary_matrix_vector_mul(&layer->Wv, input_vec, value_vec);
-
-            add_vector_inplace(value_vec, layer->bv, model_dim);
-
-    
-
-            // 2. Simplified Attention Placeholder for a single token
-
-            memcpy(attention_output_vec, value_vec, model_dim * sizeof(float)); // Copy value_vec to attention_output_vec
-
-    
-
-            // 3. Output Projection directly into the output_batch
-
-            ternary_matrix_vector_mul(&layer->Wo, attention_output_vec, current_output_vec);
-
-            add_vector_inplace(current_output_vec, layer->bo, model_dim);
-
-    
-
-            // Free intermediate vectors for this batch item
-
-            free_float_array(query_vec);
-
-            free_float_array(key_vec);
-
-            free_float_array(value_vec);
-
-            free_float_array(attention_output_vec);
-
-        }
-
-    
-
-        return output_batch;
-
+// This function processes a batch of input vectors through a simplified Multi-Head Attention mechanism.
+// It iterates through each vector in the batch, performs linear projections to obtain
+// Query (Q), Key (K), and Value (V) representations, applies a simplified attention
+// (which, in this basic version, copies the Value vector), and then projects
+// the attention output to the final output dimension.
+// Intermediate vectors (query_vec, key_vec, value_vec, attention_output_vec) are
+// allocated and freed for each item in the batch to manage memory effectively,
+// especially in a resource-constrained environment.
+//
+// input_batch: a flattened array of input vectors (batch_size * model_dim)
+// Returns: a flattened array of output vectors (batch_size * model_dim), caller must free.
+float* forward_multi_head_attention_batch(const MultiHeadAttentionLayer* layer, const float* input_batch, int batch_size, int model_dim) {
+    if (!layer || !input_batch) {
+        fprintf(stderr, "Error: Invalid input to forward_multi_head_attention_batch\n");
+        return NULL;
     }
 
-    
+    float* output_batch = create_float_array(batch_size * model_dim);
+    if (!output_batch) {
+        fprintf(stderr, "Error: Memory allocation failed for MHA output batch\n");
+        return NULL;
+    }
 
-    
+    // Process each item (vector) in the batch independently
+    for (int b = 0; b < batch_size; ++b) {
+        const float* input_vec = &input_batch[b * model_dim];
+        float* current_output_vec = &output_batch[b * model_dim];
+
+        // Allocate intermediate vectors for Query, Key, Value, and Attention output.
+        // These are allocated per batch item to reduce peak memory usage across the entire batch
+        // if only a single item's intermediates are needed at a time (e.g., for gradient checkpointing).
+        float* query_vec = create_float_array(model_dim);
+        float* key_vec = create_float_array(model_dim);
+        float* value_vec = create_float_array(model_dim);
+        float* attention_output_vec = create_float_array(model_dim); // Output before final projection
+
+        if (!query_vec || !key_vec || !value_vec || !attention_output_vec) {
+            free_float_array(query_vec); free_float_array(key_vec); free_float_array(value_vec); free_float_array(attention_output_vec);
+            free_float_array(output_batch);
+            fprintf(stderr, "Error: Memory allocation failed in forward_multi_head_attention_batch for intermediate vectors\n");
+            return NULL;
+        }
+
+        // 1. Linear Projections for Q, K, V:
+        // Input vector is multiplied by respective weight matrices (Wq, Wk, Wv) and biases are added.
+        // TernaryMatrix_vector_mul handles the matrix-vector product with 1-bit weights.
+        ternary_matrix_vector_mul(&layer->Wq, input_vec, query_vec);
+        add_vector_inplace(query_vec, layer->bq, model_dim);
+
+        ternary_matrix_vector_mul(&layer->Wk, input_vec, key_vec);
+        add_vector_inplace(key_vec, layer->bk, model_dim);
+
+        ternary_matrix_vector_mul(&layer->Wv, input_vec, value_vec);
+        add_vector_inplace(value_vec, layer->bv, model_dim);
+
+        // 2. Simplified Attention Placeholder for a single token:
+        // In a full Multi-Head Attention, Q and K would be used to compute attention scores,
+        // which would then be applied to V. Here, for simplicity and resource constraints,
+        // the Value vector itself is directly used as the attention output.
+        memcpy(attention_output_vec, value_vec, model_dim * sizeof(float)); // Copies value_vec to attention_output_vec
+
+        // 3. Output Projection:
+        // The simplified attention output is projected through the output weight matrix (Wo)
+        // and its bias (bo) is added to produce the final output for this batch item.
+        ternary_matrix_vector_mul(&layer->Wo, attention_output_vec, current_output_vec);
+        add_vector_inplace(current_output_vec, layer->bo, model_dim);
+
+        // Free intermediate vectors for this batch item to conserve memory.
+        free_float_array(query_vec);
+        free_float_array(key_vec);
+        free_float_array(value_vec);
+        free_float_array(attention_output_vec);
+    }
+
+    return output_batch;
+}
 
     // Forward pass for Feed-Forward Network
 float* forward_feed_forward(const FeedForwardLayer* layer, const float* input_vec, int model_dim) {
