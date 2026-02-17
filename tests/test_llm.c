@@ -9,6 +9,8 @@
 #include "backward.h"
 #include "test_math_ops.h" // New header for math operations tests
 #include "test_forward.h"  // New header for forward pass tests
+#include "test_backward.h" // New header for backward pass tests
+#include "test_model.h"    // New header for model persistence tests
 
 // --- Test Functions Declarations ---
 void test_ModelAllocationAndDataLoading();
@@ -22,8 +24,10 @@ int main() {
 
     // --- Call Individual Test Functions ---
     test_ModelAllocationAndDataLoading();
-    run_math_ops_tests(); // Call the new math operations tests
-    run_forward_tests();  // Call the new forward pass tests
+    run_math_ops_tests();   // Call the new math operations tests
+    run_forward_tests();    // Call the new forward pass tests
+    run_backward_tests();   // Call the new backward pass tests
+    run_model_tests();      // Call the new model persistence tests
 
     printf("===================================\n");
     printf("Total Tests Run:    %u\n", tests_run);

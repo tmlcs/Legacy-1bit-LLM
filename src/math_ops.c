@@ -18,6 +18,28 @@
 // --- Core mathematical operations ---
 
 #ifdef USE_SSE
+// Helper function: Convert 4 int8_t to 4 floats using SSE4.1 if available
+static inline __m128 convert_int8_to_float(const int8_t* data) {
+#ifdef __SSE4_1__
+    // SSE4.1 path: Load 4 int8_t, extend to 32-bit integers, then convert to float
+    // Load 4 bytes into lower 32 bits of xmm register
+    int32_t temp;
+    memcpy(&temp, data, sizeof(int32_t));
+    __m128i int_vec = _mm_cvtsi32_si128(temp);
+    // Sign-extend int8 to int32
+    __m128i int32_vec = _mm_cvtepi8_epi32(int_vec);
+    // Convert int32 to float
+    return _mm_cvtepi32_ps(int32_vec);
+#else
+    // SSE2 fallback: Scalar conversion
+    float w0 = (float)data[0];
+    float w1 = (float)data[1];
+    float w2 = (float)data[2];
+    float w3 = (float)data[3];
+    return _mm_setr_ps(w0, w1, w2, w3);
+#endif
+}
+
 // SSE-optimized ternary_matrix_vector_mul
 float* ternary_matrix_vector_mul(const TernaryMatrix* mat, const float* vec, float* output) {
     START_TIMER(ternary_matrix_vector_mul_sse);
@@ -36,12 +58,8 @@ float* ternary_matrix_vector_mul(const TernaryMatrix* mat, const float* vec, flo
             // Load 4 floats from vec
             __m128 v_elements = _mm_loadu_ps(&vec[j]);
 
-            // Load 4 int8_t weights, convert to float, then combine into __m128
-            float w0 = (float)row_weights[j];
-            float w1 = (float)row_weights[j+1];
-            float w2 = (float)row_weights[j+2];
-            float w3 = (float)row_weights[j+3];
-            __m128 w_elements = _mm_setr_ps(w0, w1, w2, w3); // Set 4 floats from weights
+            // Convert 4 int8_t weights to float using optimized conversion
+            __m128 w_elements = convert_int8_to_float(&row_weights[j]);
 
             sum_vec = _mm_add_ps(sum_vec, _mm_mul_ps(v_elements, w_elements));
         }
@@ -116,12 +134,8 @@ float* matrix_transpose_vector_mul(const TernaryMatrix* mat, const float* vec, f
             // Load 4 output elements
             __m128 out_elements = _mm_loadu_ps(&output[i]);
 
-            // Convert 4 int8_t weights to float for multiplication
-            float w0 = (float)row_weights[i];
-            float w1 = (float)row_weights[i+1];
-            float w2 = (float)row_weights[i+2];
-            float w3 = (float)row_weights[i+3];
-            __m128 w_elements = _mm_setr_ps(w0, w1, w2, w3); // Set 4 floats from weights
+            // Convert 4 int8_t weights to float using optimized conversion
+            __m128 w_elements = convert_int8_to_float(&row_weights[i]);
 
             // Add product to output
             out_elements = _mm_add_ps(out_elements, _mm_mul_ps(v_element, w_elements));

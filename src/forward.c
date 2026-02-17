@@ -311,7 +311,7 @@ float* forward_transformer_block(const TransformerBlock* block, const float* inp
     memcpy(norm1_output_buffer, input_vec, model_dim * sizeof(float)); // Copy input for normalization
     
     float ln1_mean, ln1_inv_std_dev; // Store for backward pass
-    layer_norm_forward(norm1_output_buffer, block->norm1_gamma, block->norm1_beta, model_dim, 1e-5f, &ln1_mean, &ln1_inv_std_dev);
+    layer_norm_forward(norm1_output_buffer, block->norm1_gamma, block->norm1_beta, model_dim, LAYER_NORM_EPSILON, &ln1_mean, &ln1_inv_std_dev);
 
     float* attn_output = forward_multi_head_attention(&block->attention, norm1_output_buffer, model_dim);
     free_float_array(norm1_output_buffer); // Free intermediate norm1_output_buffer
@@ -327,7 +327,7 @@ float* forward_transformer_block(const TransformerBlock* block, const float* inp
     memcpy(norm2_output_buffer, current_output, model_dim * sizeof(float)); // Copy current_output for normalization
     
     float ln2_mean, ln2_inv_std_dev; // Store for backward pass
-    layer_norm_forward(norm2_output_buffer, block->norm2_gamma, block->norm2_beta, model_dim, 1e-5f, &ln2_mean, &ln2_inv_std_dev);
+    layer_norm_forward(norm2_output_buffer, block->norm2_gamma, block->norm2_beta, model_dim, LAYER_NORM_EPSILON, &ln2_mean, &ln2_inv_std_dev);
 
     float* ffn_output = forward_feed_forward(&block->ffn, norm2_output_buffer, model_dim);
     free_float_array(norm2_output_buffer); // Free intermediate norm2_output_buffer
@@ -359,7 +359,7 @@ float* forward_transformer_block_with_context(const TransformerBlock* block, con
     if (!norm1_output_buffer) { free_float_array(current_output); return NULL; }
     memcpy(norm1_output_buffer, input_vec, model_dim * sizeof(float));
     
-    layer_norm_forward(norm1_output_buffer, block->norm1_gamma, block->norm1_beta, model_dim, 1e-5f, &context->ln1_mean_batch[0], &context->ln1_inv_std_dev_batch[0]);
+    layer_norm_forward(norm1_output_buffer, block->norm1_gamma, block->norm1_beta, model_dim, LAYER_NORM_EPSILON, &context->ln1_mean_batch[0], &context->ln1_inv_std_dev_batch[0]);
 
     // Call non-context version of MHA forward, as internal intermediates are recomputed in backward_transformer_block
     float* attn_output = forward_multi_head_attention(&block->attention, norm1_output_buffer, model_dim);
@@ -375,7 +375,7 @@ float* forward_transformer_block_with_context(const TransformerBlock* block, con
     if (!norm2_output_buffer) { free_float_array(current_output); return NULL; }
     memcpy(norm2_output_buffer, current_output, model_dim * sizeof(float));
     
-    layer_norm_forward(norm2_output_buffer, block->norm2_gamma, block->norm2_beta, model_dim, 1e-5f, &context->ln2_mean_batch[0], &context->ln2_inv_std_dev_batch[0]);
+    layer_norm_forward(norm2_output_buffer, block->norm2_gamma, block->norm2_beta, model_dim, LAYER_NORM_EPSILON, &context->ln2_mean_batch[0], &context->ln2_inv_std_dev_batch[0]);
 
     // Call non-context version of FFN forward, as internal intermediates are recomputed in backward_transformer_block
     float* ffn_output = forward_feed_forward(&block->ffn, norm2_output_buffer, model_dim);
@@ -411,7 +411,7 @@ float* forward_transformer_block_batch_with_context(const TransformerBlock* bloc
     // Apply LayerNorm to each item in the batch
     for (int b = 0; b < batch_size; ++b) {
         float* input_vec_single = &norm1_output_buffer_batch[b * model_dim];
-        layer_norm_forward(input_vec_single, block->norm1_gamma, block->norm1_beta, model_dim, 1e-5f, &context->ln1_mean_batch[b], &context->ln1_inv_std_dev_batch[b]);
+        layer_norm_forward(input_vec_single, block->norm1_gamma, block->norm1_beta, model_dim, LAYER_NORM_EPSILON, &context->ln1_mean_batch[b], &context->ln1_inv_std_dev_batch[b]);
     }
     
     float* attn_output_batch = forward_multi_head_attention_batch(&block->attention, norm1_output_buffer_batch, batch_size, model_dim);
@@ -432,7 +432,7 @@ float* forward_transformer_block_batch_with_context(const TransformerBlock* bloc
     // Apply LayerNorm to each item in the batch
     for (int b = 0; b < batch_size; ++b) {
         float* input_vec_single = &norm2_output_buffer_batch[b * model_dim];
-        layer_norm_forward(input_vec_single, block->norm2_gamma, block->norm2_beta, model_dim, 1e-5f, &context->ln2_mean_batch[b], &context->ln2_inv_std_dev_batch[b]);
+        layer_norm_forward(input_vec_single, block->norm2_gamma, block->norm2_beta, model_dim, LAYER_NORM_EPSILON, &context->ln2_mean_batch[b], &context->ln2_inv_std_dev_batch[b]);
     }
 
     float* ffn_output_batch = forward_feed_forward_batch(&block->ffn, norm2_output_buffer_batch, batch_size, model_dim);

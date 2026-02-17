@@ -11,6 +11,7 @@
 #define MAX_SEQUENCE_LENGTH 128 // Max input sequence length for model
 #define BATCH_SIZE 8 // Number of sequences in a batch
 #define PAD_TOKEN MAX_VOCAB_SIZE  // Special token for padding, using MAX_VOCAB_SIZE to avoid conflict with actual char codes
+#define LAYER_NORM_EPSILON 1e-5f // Epsilon for layer normalization to prevent division by zero
 
 // --- Data Structures for Ternary Weights ---
 

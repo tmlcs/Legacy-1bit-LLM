@@ -2,16 +2,6 @@
 #include "math_ops.h"       // Functions to be tested
 #include <float.h> // For FLT_EPSILON
 
-// --- Helper function for float array comparison ---
-static int compare_float_arrays(const float* arr1, const float* arr2, int size, float epsilon) {
-    for (int i = 0; i < size; ++i) {
-        if (fabs(arr1[i] - arr2[i]) > epsilon) {
-            return 0; // Not equal
-        }
-    }
-    return 1; // Equal
-}
-
 // --- Test Functions ---
 
 void test_add_vector_inplace() {
@@ -300,7 +290,7 @@ void test_softmax() {
     // Expected = {0.090, 0.245, 0.664} (approx)
     float expected[] = {0.09003057f, 0.24472847f, 0.66524096f}; // Calculated with higher precision
     int size = 3;
-    float epsilon = 1e-5f; // Softmax can have larger numerical errors
+    float epsilon = LAYER_NORM_EPSILON; // Softmax can have larger numerical errors
 
     softmax(vec, size);
     ASSERT_TRUE(compare_float_arrays(vec, expected, size, epsilon), "Softmax failed.");
@@ -341,7 +331,7 @@ void test_layer_norm_forward() {
     float expected_mean = 2.0f;
     float expected_inv_std_dev = 1.22474487f;
 
-    layer_norm_forward(input, gamma, beta, size, 1e-5f, &out_mean_val, &out_inv_std_dev_val);
+    layer_norm_forward(input, gamma, beta, size, LAYER_NORM_EPSILON, &out_mean_val, &out_inv_std_dev_val);
 
     ASSERT_TRUE(compare_float_arrays(input, expected_input, size, epsilon), "LayerNorm input modification failed.");
     ASSERT_EQUALS_FLOAT(out_mean_val, expected_mean, epsilon, "LayerNorm mean failed.");
@@ -354,7 +344,7 @@ void test_layer_norm_forward() {
     // Expected: (normalized * 2) + 1
     // { (-1.2247 * 2) + 1 = -1.4494, (0.0 * 2) + 1 = 1.0, (1.2247 * 2) + 1 = 3.4494 }
     float expected_input2[] = {-1.4494897f, 1.0f, 3.4494897f};
-    layer_norm_forward(input2, gamma2, beta2, size, 1e-5f, &out_mean_val, &out_inv_std_dev_val);
+    layer_norm_forward(input2, gamma2, beta2, size, LAYER_NORM_EPSILON, &out_mean_val, &out_inv_std_dev_val);
     ASSERT_TRUE(compare_float_arrays(input2, expected_input2, size, epsilon), "LayerNorm with gamma/beta failed.");
 
 
@@ -372,7 +362,7 @@ void test_layer_norm() {
     // Expected calculation same as layer_norm_forward with gamma=1, beta=0
     float expected_input[] = {-1.22474487f, 0.0f, 1.22474487f};
 
-    layer_norm(input, gamma, beta, size, 1e-5f);
+    layer_norm(input, gamma, beta, size, LAYER_NORM_EPSILON);
 
     ASSERT_TRUE(compare_float_arrays(input, expected_input, size, epsilon), "LayerNorm failed (simplified).");
 
@@ -381,7 +371,7 @@ void test_layer_norm() {
     float beta2[] = {1.0f, 1.0f, 1.0f};
     float expected_input2[] = {-1.4494897f, 1.0f, 3.4494897f};
     size = 3;
-    layer_norm(input2, gamma2, beta2, size, 1e-5f);
+    layer_norm(input2, gamma2, beta2, size, LAYER_NORM_EPSILON);
     ASSERT_TRUE(compare_float_arrays(input2, expected_input2, size, epsilon), "LayerNorm with gamma/beta failed (simplified).");
 
     TEST_END();

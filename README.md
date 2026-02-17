@@ -56,10 +56,6 @@ This will first execute the built-in test suite and then proceed with the traini
 ```
 .
 ├── Makefile                     # Project Makefile for compilation
-├── Instrucciones.md             # (Possibly original instructions/notes)
-├── mi_modelo.py                 # (External Python model, likely for reference)
-├── preparar_datos.py            # (External Python script, likely for reference)
-├── train.py                     # (External Python script, likely for reference)
 ├── data/                        # Directory for datasets
 │   └── saioa_stories_sample.txt # Sample text dataset used for training
 ├── include/                     # Header files for the C project

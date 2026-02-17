@@ -55,4 +55,14 @@ static unsigned int assertions_failed = 0;
 #define ASSERT_NOT_NULL(ptr, message, ...) ASSERT_TRUE((ptr) != NULL, message, ##__VA_ARGS__)
 #define ASSERT_NULL(ptr, message, ...) ASSERT_TRUE((ptr) == NULL, message, ##__VA_ARGS__)
 
+// --- Helper function for float array comparison ---
+static int compare_float_arrays(const float* arr1, const float* arr2, int size, float epsilon) {
+    for (int i = 0; i < size; ++i) {
+        if (fabs(arr1[i] - arr2[i]) > epsilon) {
+            return 0; // Not equal
+        }
+    }
+    return 1; // Equal
+}
+
 #endif // TEST_FRAMEWORK_H

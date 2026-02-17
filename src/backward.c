@@ -518,7 +518,7 @@ float* backward_transformer_block(const TransformerBlock* block, const float* d_
     // Use stored mean/inv_std_dev
     // Note: layer_norm_forward modifies its input, so we use a temporary copy.
     float temp_ln1_mean, temp_ln1_inv_std_dev; // dummy variables as mean/inv_std_dev are stored in context
-    layer_norm_forward(norm1_output_buffer_recomputed, block->norm1_gamma, block->norm1_beta, model_dim, 1e-5f, &temp_ln1_mean, &temp_ln1_inv_std_dev);
+    layer_norm_forward(norm1_output_buffer_recomputed, block->norm1_gamma, block->norm1_beta, model_dim, LAYER_NORM_EPSILON, &temp_ln1_mean, &temp_ln1_inv_std_dev);
 
     // Recompute attn_output
     float* attn_output_recomputed = forward_multi_head_attention(&block->attention, norm1_output_buffer_recomputed, model_dim);
@@ -545,7 +545,7 @@ float* backward_transformer_block(const TransformerBlock* block, const float* d_
     memcpy(norm2_output_buffer_recomputed, current_output_after_attn_residual_recomputed, model_dim * sizeof(float));
     // Apply LayerNorm (only forward pass is needed)
     float temp_ln2_mean, temp_ln2_inv_std_dev; // dummy variables
-    layer_norm_forward(norm2_output_buffer_recomputed, block->norm2_gamma, block->norm2_beta, model_dim, 1e-5f, &temp_ln2_mean, &temp_ln2_inv_std_dev);
+    layer_norm_forward(norm2_output_buffer_recomputed, block->norm2_gamma, block->norm2_beta, model_dim, LAYER_NORM_EPSILON, &temp_ln2_mean, &temp_ln2_inv_std_dev);
 
     // Recompute ffn_output (not strictly needed for backward pass, but for consistency if we wanted to check final output)
     float* ffn_output_recomputed = forward_feed_forward(&block->ffn, norm2_output_buffer_recomputed, model_dim);
@@ -901,7 +901,7 @@ void backward_llm_batch(LegacyLLM* model, const int* input_batch, const int* tar
 
             float temp_ln1_mean, temp_ln1_inv_std_dev; // dummy
 
-            layer_norm_forward(norm1_output_buffer_recomputed, block->norm1_gamma, block->norm1_beta, model_dim, 1e-5f, &temp_ln1_mean, &temp_ln1_inv_std_dev);
+            layer_norm_forward(norm1_output_buffer_recomputed, block->norm1_gamma, block->norm1_beta, model_dim, LAYER_NORM_EPSILON, &temp_ln1_mean, &temp_ln1_inv_std_dev);
 
     
 
@@ -937,7 +937,7 @@ void backward_llm_batch(LegacyLLM* model, const int* input_batch, const int* tar
 
             float temp_ln2_mean, temp_ln2_inv_std_dev; // dummy
 
-            layer_norm_forward(norm2_output_buffer_recomputed, block->norm2_gamma, block->norm2_beta, model_dim, 1e-5f, &temp_ln2_mean, &temp_ln2_inv_std_dev);
+            layer_norm_forward(norm2_output_buffer_recomputed, block->norm2_gamma, block->norm2_beta, model_dim, LAYER_NORM_EPSILON, &temp_ln2_mean, &temp_ln2_inv_std_dev);
 
     
 

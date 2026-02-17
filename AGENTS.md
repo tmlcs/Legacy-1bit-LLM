@@ -5,18 +5,24 @@ C99 project implementing a ternary (-1, 0, 1) quantized Large Language Model opt
 ## Build Commands
 
 ```bash
-# Build everything (both SSE and non-SSE variants)
+# Build main application (non-SSE by default)
 make
 
-# Build with SSE optimization enabled
-make USE_SSE_BUILD=1
+# Build with SSE optimization
+make legacy_llm_sse
 
 # Build specific variants
-make legacy_llm_sse      # SSE optimized
 make legacy_llm_no_sse   # Non-SSE fallback
+
+# Build test runners
+make test_runner_no_sse
+make test_runner_sse
 
 # Clean build artifacts
 make clean
+
+# Run all tests (builds both variants and runs them)
+make test
 
 # Run performance comparison
 make perf
@@ -25,13 +31,17 @@ make perf
 ## Run Commands
 
 ```bash
-# Run the executable (runs tests, then training)
-./legacy_llm_sse
+# Run the main application
 ./legacy_llm_no_sse
+./legacy_llm_sse
+
+# Run test runners individually
+./test_runner_no_sse
+./test_runner_sse
 
 # Check performance logs
-cat sse_perf_log.txt
 cat no_sse_perf_log.txt
+cat sse_perf_log.txt
 ```
 
 ## Code Style Guidelines
@@ -56,7 +66,10 @@ include/       # Public headers only
   forward.h    # Forward pass functions
   backward.h   # Backward pass functions
   data_utils.h # Data loading and tokenization
+  test_framework.h  # Test framework macros
   test_llm.h   # Test declarations
+  test_forward.h    # Forward pass test declarations
+  test_math_ops.h   # Math ops test declarations
 
 src/           # Implementation files
   main.c       # Entry point, training loop
@@ -67,9 +80,9 @@ src/           # Implementation files
   data_utils.c # Data utilities
 
 tests/         # Test suite
-  test_llm.c   # Unit tests
-
-AUDIT.md       # Detailed quality audit report
+  test_llm.c      # Main test runner
+  test_forward.c  # Forward pass tests
+  test_math_ops.c # Math operations tests
 ```
 
 ### Headers
@@ -149,10 +162,11 @@ if (!write_to_file(fp, data, len)) {
 - Document units and constraints in struct definitions
 
 ### Testing
-- Tests are compiled into the main executable
-- Run automatically at startup via `run_all_llm_tests()`
-- Tests use `printf()` for output visibility
-- No separate test runner - use main binary
+- Tests are compiled into separate test runner binaries (`test_runner_no_sse`, `test_runner_sse`)
+- Run all tests via `make test`
+- Run individual test runners directly: `./test_runner_no_sse`
+- Tests use custom framework macros: `TEST_BEGIN()`, `TEST_END()`, `ASSERT_TRUE()`, `ASSERT_EQUALS_FLOAT()`
+- Test files: `tests/test_llm.c` (main), `tests/test_forward.c`, `tests/test_math_ops.c`
 
 ### Compiler Flags
 ```bash

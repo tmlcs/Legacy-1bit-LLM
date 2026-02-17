@@ -3,17 +3,6 @@
 #include "model.h" // For TernaryMatrix, create_float_array, free_float_array
 #include "legacy_llm.h" // For EmbeddingLayer, MODEL_DIM, PAD_TOKEN
 
-// Helper for float array comparison (copied from test_math_ops.c, can be moved to test_framework.h)
-static int compare_float_arrays(const float* arr1, const float* arr2, int size, float epsilon) {
-    for (int i = 0; i < size; ++i) {
-        if (fabs(arr1[i] - arr2[i]) > epsilon) {
-            return 0; // Not equal
-        }
-    }
-    return 1; // Equal
-}
-
-
 // Function to create a dummy EmbeddingLayer for testing
 EmbeddingLayer create_dummy_embedding_layer(int vocab_size, int model_dim) {
     EmbeddingLayer layer;

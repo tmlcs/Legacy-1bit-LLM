@@ -350,7 +350,7 @@ LegacyLLM* create_legacy_llm(int vocab_size, int model_dim, int num_transformer_
         model->transformer_blocks[i].ffn.bi = create_float_array(ffn_hidden_dim);
         if (!model->transformer_blocks[i].ffn.bi) { free_legacy_llm(model); return NULL; }
         model->transformer_blocks[i].ffn.bo = create_float_array(model_dim);
-        if (!model->transformer_blocks[i].attention.bo) { free_legacy_llm(model); return NULL; }
+        if (!model->transformer_blocks[i].ffn.bo) { free_legacy_llm(model); return NULL; }
 
         // Layer Normalization
         model->transformer_blocks[i].norm1_gamma = create_float_array(model_dim);

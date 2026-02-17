@@ -5,7 +5,7 @@ COMMON_CFLAGS = -Wall -Wextra -std=c99 -Iinclude
 # Core source files (common to both main app and tests, excluding main and test files)
 CORE_SRCS = src/math_ops.c src/data_utils.c src/model.c src/forward.c src/backward.c
 MAIN_SRCS = src/main.c
-TEST_SRCS = tests/test_llm.c tests/test_math_ops.c tests/test_forward.c
+TEST_SRCS = tests/test_llm.c tests/test_math_ops.c tests/test_forward.c tests/test_backward.c tests/test_model.c
 
 # Object files for non-SSE build
 CORE_OBJS_NO_SSE = $(addprefix obj_no_sse/,$(CORE_SRCS:.c=.o))
