@@ -121,6 +121,65 @@ The training loop will:
 4. Run 10 epochs of training
 5. Save checkpoints every 2 epochs
 6. Display loss and perplexity metrics
+7. Track Top-k accuracy (Top-1, Top-3, Top-5)
+8. Log metrics to JSON file in `logs/` directory
+
+### Training Metrics
+
+During training, the system tracks and logs:
+- **Loss:** Cross-entropy loss per epoch
+- **Perplexity:** exp(loss) for language modeling evaluation
+- **Top-k Accuracy:** Percentage of correct predictions in top-k
+  - Top-1: Exact match accuracy
+  - Top-3: Correct answer in top 3 predictions
+  - Top-5: Correct answer in top 5 predictions
+- **Training Time:** Epoch duration and total training time
+- **JSON Logs:** Detailed metrics saved to `logs/training_YYYYMMDD_HHMMSS.json`
+
+## How to Run Inference
+
+After training, use the inference mode to generate text:
+
+```bash
+# Build inference executable
+make inference_sse
+
+# Generate text with greedy sampling (default)
+./inference_sse "Once upon a time"
+
+# Generate with temperature sampling
+./inference_sse -s temperature -t 0.8 "Hello world"
+
+# Generate with top-k sampling
+./inference_sse -s topk -k 40 -n 200 "In 1492,"
+```
+
+### Inference Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-m, --model` | Model file path | `llm_model.bin` |
+| `-n, --max-tokens` | Maximum tokens to generate | 100 |
+| `-s, --strategy` | Sampling strategy: greedy, temperature, topk | greedy |
+| `-t, --temperature` | Temperature for sampling (0.1-2.0) | 1.0 |
+| `-k, --top-k` | Top-k value for sampling | 0 (disabled) |
+| `--seed` | Random seed | Current time |
+
+### Sampling Strategies
+
+1. **Greedy:** Always selects the most probable next token
+   - Best for: Deterministic, coherent text
+   - Usage: `./inference_sse "Your prompt here"`
+
+2. **Temperature:** Controls randomness via temperature scaling
+   - T < 1.0: More focused, conservative
+   - T > 1.0: More creative, diverse
+   - Usage: `./inference_sse -s temperature -t 0.7 "Your prompt"`
+
+3. **Top-k:** Samples only from top-k most likely tokens
+   - k=40: Balanced creativity and coherence
+   - k=10: More focused
+   - Usage: `./inference_sse -s topk -k 40 "Your prompt"`
 
 ## File Structure
 
@@ -147,20 +206,23 @@ The training loop will:
 │   ├── test_math_ops.h           # Math operations test declarations
 │   ├── test_forward.h            # Forward pass test declarations
 │   ├── test_backward.h           # Backward pass test declarations
-│   └── test_model.h              # Model test declarations
-├── src/                          # Source files (6 files)
+│   ├── test_model.h              # Model test declarations
+│   └── logger.h                  # 🆕 Structured logging system
+├── src/                          # Source files (7 files)
 │   ├── main.c                    # Training loop and entry point
 │   ├── model.c                   # Model lifecycle and persistence
 │   ├── math_ops.c                # Optimized math operations (SSE4.1)
 │   ├── forward.c                 # Forward pass implementation
 │   ├── backward.c                # Backward pass implementation
-│   └── data_utils.c              # Data loading and tokenization
+│   ├── data_utils.c              # Data loading and tokenization
+│   ├── logger.c                  # 🆕 JSON logging implementation
+│   └── inference.c               # 🆕 Text generation and inference
 └── tests/                        # Test files (5 files)
     ├── test_llm.c                # Integration tests
     ├── test_math_ops.c           # Math operations tests (13 tests)
     ├── test_forward.c            # Forward pass tests (6 tests)
-    ├── test_backward.c           # Backward pass tests (5 tests) 🆕
-    └── test_model.c              # Model tests (6 tests) 🆕
+    ├── test_backward.c           # Backward pass tests (5 tests)
+    └── test_model.c              # Model tests (6 tests)
 ```
 
 ## Recent Improvements (Feb 2026)
@@ -183,22 +245,35 @@ The training loop will:
 - **Result:** 2x faster than Non-SSE builds (50.9% improvement)
 - Performance benchmarks documented
 
+### Phase 4: Advanced Features ✅
+
+### Phase 4: Advanced Features
+- **Structured JSON Logging:** Complete logging system with timestamped JSON files
+  - Logs saved to `logs/training_YYYYMMDD_HHMMSS.json`
+  - Tracks loss, perplexity, top-k accuracy, and timing per epoch
+- **Top-k Accuracy Tracking:** Real-time accuracy metrics during training
+  - Top-1, Top-3, and Top-5 accuracy percentages
+- **Inference Mode:** Dedicated text generation program
+  - Executable: `inference_sse` / `inference_no_sse`
+  - Autoregressive text generation from prompts
+- **Sampling Strategies:** Three different sampling methods
+  - Greedy: Deterministic, highest probability
+  - Temperature: Controllable randomness (T parameter)
+  - Top-k: Sampling from k most likely tokens
+
 ## Future Enhancements
 
-### In Progress (Phase 4)
-*   **Advanced Training Metrics and Logging:** Enhanced metrics beyond basic loss (e.g., accuracy top-k) and structured logging (JSON/CSV)
-*   **Inference Mode:** Dedicated inference mode for text generation with sampling strategies (greedy, temperature, top-k)
+### In Progress (Phase 5)
 *   **Improved Dataset Handling:** Support for streaming large datasets, dynamic batching, BPE tokenization
-
-### Planned (Phase 5)
 *   **Hyperparameter Tuning:** Systematic experimentation with learning rates, model dimensions, and architecture variations
 *   **Advanced Quantization:** Exploration of quantization-aware training techniques (straight-through estimators)
 *   **Extended Quantization Schemes:** Investigation of binary weights and 2-bit quantization alternatives
 
 ## Project Statistics
 
-- **Lines of Code:** ~4,200
-- **Test Coverage:** ~85%
+- **Lines of Code:** ~4,800
+- **Test Coverage:** ~85% (31 tests)
 - **Code Quality:** 9.5/10
 - **Performance:** 2x speedup with SSE optimizations
+- **Features:** Training + Inference + Logging + Metrics
 - **License:** Open source (see LICENSE file)

@@ -3,18 +3,21 @@ CC = gcc
 COMMON_CFLAGS = -Wall -Wextra -std=c99 -Iinclude
 
 # Core source files (common to both main app and tests, excluding main and test files)
-CORE_SRCS = src/math_ops.c src/data_utils.c src/model.c src/forward.c src/backward.c
+CORE_SRCS = src/math_ops.c src/data_utils.c src/model.c src/forward.c src/backward.c src/logger.c
 MAIN_SRCS = src/main.c
+INFER_SRCS = src/inference.c
 TEST_SRCS = tests/test_llm.c tests/test_math_ops.c tests/test_forward.c tests/test_backward.c tests/test_model.c
 
 # Object files for non-SSE build
 CORE_OBJS_NO_SSE = $(addprefix obj_no_sse/,$(CORE_SRCS:.c=.o))
 MAIN_OBJS_NO_SSE = $(addprefix obj_no_sse/,$(MAIN_SRCS:.c=.o))
+INFER_OBJS_NO_SSE = $(addprefix obj_no_sse/,$(INFER_SRCS:.c=.o))
 TEST_OBJS_NO_SSE = $(addprefix obj_no_sse/,$(TEST_SRCS:.c=.o))
 
 # Object files for SSE build
 CORE_OBJS_SSE = $(addprefix obj_sse/,$(CORE_SRCS:.c=.o))
 MAIN_OBJS_SSE = $(addprefix obj_sse/,$(MAIN_SRCS:.c=.o))
+INFER_OBJS_SSE = $(addprefix obj_sse/,$(INFER_SRCS:.c=.o))
 TEST_OBJS_SSE = $(addprefix obj_sse/,$(TEST_SRCS:.c=.o))
 
 # Define object directories
@@ -48,6 +51,16 @@ legacy_llm_no_sse: $(MAIN_OBJS_NO_SSE) $(CORE_OBJS_NO_SSE)
 # SSE optimized build (for main application)
 legacy_llm_sse: $(MAIN_OBJS_SSE) $(CORE_OBJS_SSE)
 	$(CC) $(COMMON_CFLAGS) -DUSE_SSE -msse -msse2 $(MEASURE_PERF_FLAG) $(MAIN_OBJS_SSE) $(CORE_OBJS_SSE) -o $@ -lm
+
+# --- Inference Builds ---
+
+# Inference build (non-SSE)
+inference_no_sse: $(INFER_OBJS_NO_SSE) $(CORE_OBJS_NO_SSE)
+	$(CC) $(COMMON_CFLAGS) $(INFER_OBJS_NO_SSE) $(CORE_OBJS_NO_SSE) -o $@ -lm
+
+# Inference build (SSE optimized)
+inference_sse: $(INFER_OBJS_SSE) $(CORE_OBJS_SSE)
+	$(CC) $(COMMON_CFLAGS) -DUSE_SSE -msse -msse2 $(INFER_OBJS_SSE) $(CORE_OBJS_SSE) -o $@ -lm
 
 # --- Test Runner Builds ---
 
@@ -91,5 +104,7 @@ perf: clean
 clean:
 	rm -rf $(OBJ_DIRS)
 	rm -f legacy_llm_no_sse legacy_llm_sse
+	rm -f inference_no_sse inference_sse
 	rm -f test_runner_no_sse test_runner_sse
 	rm -f sse_perf_log.txt no_sse_perf_log.txt
+	rm -rf logs/

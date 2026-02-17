@@ -65,7 +65,7 @@ This action plan outlines the next steps for improving the "Legacy-1bit LLM" pro
 
 ## 3. Future Enhancements 📋 ROADMAP
 
-**Status Update (Feb 2026):** Phases 1-3 completed. Moving to Phase 4 implementation.
+**Status Update (Feb 2026):** Phases 1-4 completed. Moving to Phase 5 implementation.
 
 ### ✅ Already Completed
 *   ~~**Performance Analysis (SSE vs. Non-SSE):**~~ **COMPLETED - Feb 2026**
@@ -73,21 +73,38 @@ This action plan outlines the next steps for improving the "Legacy-1bit LLM" pro
     *   **Key Optimizations:** SSE4.1 int8→float conversion, 2x speedup in matrix operations
     *   **Documentation:** See benchmark results in PROJECT_PLAN.md
 
-### 🚧 In Progress (Phase 4)
-*   **Advanced Training Metrics and Logging:**
-    *   **Priority:** HIGH
-    *   **Description:** Integrate more sophisticated metrics beyond basic loss (e.g., perplexity - already calculated, accuracy top-k) and structured logging (JSON/CSV)
-    *   **Timeline:** Weeks 11-12
-*   **Inference Mode:**
-    *   **Priority:** HIGH
-    *   **Description:** Implement dedicated inference mode for text generation with sampling strategies (greedy, temperature, top-k)
-    *   **Timeline:** Weeks 13-14
+### ✅ Already Completed (Phase 4)
+*   ~~**Advanced Training Metrics and Logging:**~~ **COMPLETED - Feb 2026**
+    *   **Files Created:** `include/logger.h`, `src/logger.c`
+    *   **Features Implemented:**
+      - JSON structured logging with timestamps
+      - Logs saved to `logs/training_YYYYMMDD_HHMMSS.json`
+      - Per-epoch metrics: loss, perplexity, top-k accuracy, timing
+    *   **Status:** ✅ Fully functional
+
+*   ~~**Inference Mode:**~~ **COMPLETED - Feb 2026**
+    *   **Files Created:** `src/inference.c`
+    *   **Executables:** `inference_sse`, `inference_no_sse`
+    *   **Features Implemented:**
+      - Autoregressive text generation
+      - Three sampling strategies: Greedy, Temperature, Top-k
+      - Command-line interface with extensive options
+      - Prompt-based generation
+    *   **Usage:** `./inference_sse "Your prompt here"`
+    *   **Status:** ✅ Fully functional
+
+*   **Top-k Accuracy Tracking:**
+    *   **Implementation:** `calculate_top_k_accuracy()` in `src/main.c`
+    *   **Metrics:** Top-1, Top-3, Top-5 accuracy percentages
+    *   **Integration:** Real-time tracking during training
+    *   **Status:** ✅ Fully functional
+
+### 🚧 In Progress (Phase 5)
 *   **Improved Dataset Handling:**
     *   **Priority:** MEDIUM
     *   **Description:** Support streaming for larger datasets, dynamic batching, BPE tokenization
-    *   **Timeline:** Weeks 15-16
-
-### 📅 Planned (Phase 5)
+    *   **Timeline:** Weeks 17-18
+    *   **Status:** 🚧 Not started
 *   **Hyperparameter Tuning:**
     *   **Priority:** MEDIUM
     *   **Description:** Grid search for learning rates, model dimensions, transformer blocks
@@ -121,8 +138,22 @@ This action plan outlines the next steps for improving the "Legacy-1bit LLM" pro
 - Achieved 2x performance improvement
 - All 31 tests passing in both SSE and Non-SSE builds
 
+### Phase 4: Advanced Features ✅
+- **Structured JSON Logging:** Complete logging system
+  - Files: `logger.h`, `logger.c`
+  - Generates timestamped JSON logs in `logs/` directory
+- **Top-k Accuracy Tracking:** Real-time accuracy metrics
+  - Top-1, Top-3, Top-5 accuracy during training
+- **Inference Mode:** Dedicated text generation program
+  - Files: `inference.c`
+  - Executables: `inference_sse`, `inference_no_sse`
+  - Three sampling strategies: Greedy, Temperature, Top-k
+  - Autoregressive text generation
+  - Command-line interface
+
 ### Quality Metrics
 - **Code Quality:** 8.5/10 → 9.5/10
 - **Test Coverage:** ~50% → ~85%
 - **Performance:** 2x speedup with SSE
 - **Bugs:** 1 critical (fixed) → 0 critical
+- **Features:** Training + Inference + Logging + Metrics
