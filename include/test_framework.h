@@ -6,6 +6,15 @@
 #include <string.h>
 #include <math.h>    // For fabs
 
+// Compiler-agnostic unused macro
+#if defined(__GNUC__) || defined(__clang__)
+    #define UNUSED_ATTR __attribute__((unused))
+#elif defined(_MSC_VER)
+    #define UNUSED_ATTR __pragma(warning(suppress:4505))
+#else
+    #define UNUSED_ATTR
+#endif
+
 // --- Custom Test Framework Macros ---
 
 static unsigned int tests_run = 0;
@@ -56,6 +65,7 @@ static unsigned int assertions_failed = 0;
 #define ASSERT_NULL(ptr, message, ...) ASSERT_TRUE((ptr) == NULL, message, ##__VA_ARGS__)
 
 // --- Helper function for float array comparison ---
+UNUSED_ATTR
 static int compare_float_arrays(const float* arr1, const float* arr2, int size, float epsilon) {
     for (int i = 0; i < size; ++i) {
         if (fabs(arr1[i] - arr2[i]) > epsilon) {

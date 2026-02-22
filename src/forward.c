@@ -298,8 +298,11 @@ float* forward_feed_forward_batch(const FeedForwardLayer* layer, const float* in
     return output_batch;
 }
 
-
 // Forward pass for a single Transformer Block
+// NOTE: This function intentionally uses deprecated single-item functions internally.
+// It is kept for backward compatibility and testing purposes.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 float* forward_transformer_block(const TransformerBlock* block, const float* input_vec, int model_dim) {
     // This function is for testing only, will be replaced by forward_transformer_block_with_context
     if (!block || !input_vec) {
@@ -345,8 +348,13 @@ float* forward_transformer_block(const TransformerBlock* block, const float* inp
 
     return current_output;
 }
+#pragma GCC diagnostic pop
 
 // Forward pass for a single Transformer Block, storing context for backward pass
+// NOTE: This function intentionally uses deprecated single-item functions internally.
+// It is kept for backward compatibility and testing purposes.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 float* forward_transformer_block_with_context(const TransformerBlock* block, const float* input_vec, int model_dim, TransformerBlockContext* context) {
     if (!block || !input_vec || !context) {
         fprintf(stderr, "Error: Invalid input to forward_transformer_block_with_context\n");
@@ -394,6 +402,7 @@ float* forward_transformer_block_with_context(const TransformerBlock* block, con
 
     return current_output;
 }
+#pragma GCC diagnostic pop
 
 // Forward pass for a single Transformer Block, storing context for backward pass (Batched version)
 float* forward_transformer_block_batch_with_context(const TransformerBlock* block, const float* input_batch, int batch_size, int model_dim, TransformerBlockContext* context) {

@@ -499,7 +499,11 @@ float* backward_multi_head_attention(const MultiHeadAttentionLayer* layer, const
 }
 
 // Backward pass for a Transformer Block
+// NOTE: This function intentionally uses deprecated single-item functions internally.
+// It is kept for backward compatibility and testing purposes.
 // Returns: dLoss/dInput (to be propagated backwards), caller must free.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 float* backward_transformer_block(const TransformerBlock* block, const float* d_loss_d_block_output, int model_dim, int block_idx, LegacyLLM_Gradients* grads, const TransformerBlockContext* context) {
     if (!block || !d_loss_d_block_output || !context || !grads || block_idx < 0 || block_idx >= grads->num_transformer_blocks) {
         fprintf(stderr, "Error: Invalid input to backward_transformer_block\n");
@@ -722,6 +726,7 @@ float* backward_transformer_block(const TransformerBlock* block, const float* d_
 
     return d_loss_d_block_input;
 }
+#pragma GCC diagnostic pop
 
 // Backward pass for Embedding Layer
 void backward_embedding(const EmbeddingLayer* layer, int token_id, const float* d_loss_d_embedding_output, int model_dim, LegacyLLM_Gradients* grads) {
@@ -848,7 +853,10 @@ void backward_llm_batch(LegacyLLM* model, const int* input_batch, const int* tar
     
 
     // Backward pass for a Transformer Block (Batched version)
-
+    // NOTE: This function intentionally uses deprecated single-item functions internally.
+    // It is kept for backward compatibility and testing purposes.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     float* backward_transformer_block_batch(const TransformerBlock* block, const float* d_loss_d_block_output_batch, int batch_size, int model_dim, int block_idx, LegacyLLM_Gradients* grads, const TransformerBlockContext* context) {
 
         if (!block || !d_loss_d_block_output_batch || !context || !grads || block_idx < 0 || block_idx >= grads->num_transformer_blocks) {
@@ -1180,5 +1188,6 @@ void backward_llm_batch(LegacyLLM* model, const int* input_batch, const int* tar
         return d_loss_d_block_input_batch;
 
     }
+#pragma GCC diagnostic pop
 
     
