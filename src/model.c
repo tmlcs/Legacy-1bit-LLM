@@ -3,6 +3,7 @@
 #include <string.h>
 #include <time.h>    // For srand, rand
 #include <math.h>    // For sqrtf, expf, logf
+#include <limits.h>  // For INT_MAX
 
 #include "model.h"
 #include "legacy_llm.h" // For struct definitions
@@ -16,7 +17,7 @@
 
 // Function to write a TernaryMatrix to file
 static int write_ternary_matrix(FILE* fp, const TernaryMatrix* mat) {
-    size_t total_elements = (size_t)mat->rows * mat->cols;
+    size_t total_elements = (size_t)mat->rows * (size_t)mat->cols;
     if (fwrite(&mat->rows, sizeof(int), 1, fp) != 1 ||
         fwrite(&mat->cols, sizeof(int), 1, fp) != 1 ||
         fwrite(mat->data, sizeof(int8_t), total_elements, fp) != total_elements) {
@@ -31,7 +32,12 @@ static int read_ternary_matrix(FILE* fp, TernaryMatrix* mat) {
         fread(&mat->cols, sizeof(int), 1, fp) != 1) {
         return 0; // Error
     }
-    size_t total_elements = (size_t)mat->rows * mat->cols;
+    // Validate dimensions to prevent overflow/memory exhaustion
+    if (mat->rows <= 0 || mat->cols <= 0 || mat->rows > 100000 || mat->cols > 100000) {
+        fprintf(stderr, "Error: Invalid TernaryMatrix dimensions %dx%d\n", mat->rows, mat->cols);
+        return 0;
+    }
+    size_t total_elements = (size_t)mat->rows * (size_t)mat->cols;
     mat->data = (int8_t*)malloc(total_elements * sizeof(int8_t));
     if (!mat->data) {
         perror("Error allocating memory for TernaryMatrix data during load");
@@ -165,6 +171,23 @@ LegacyLLM* load_model(const char* filepath) {
         return NULL;
     }
 
+    // Validate dimensions to prevent memory exhaustion attacks
+    if (vocab_size <= 0 || vocab_size > MAX_VOCAB_SIZE) {
+        fclose(fp);
+        fprintf(stderr, "Error: Invalid vocab_size %d (must be 1-%d).\n", vocab_size, MAX_VOCAB_SIZE);
+        return NULL;
+    }
+    if (model_dim <= 0 || model_dim > 4096) {
+        fclose(fp);
+        fprintf(stderr, "Error: Invalid model_dim %d (must be 1-4096).\n", model_dim);
+        return NULL;
+    }
+    if (num_transformer_blocks < 0 || num_transformer_blocks > 100) {
+        fclose(fp);
+        fprintf(stderr, "Error: Invalid num_transformer_blocks %d (must be 0-100).\n", num_transformer_blocks);
+        return NULL;
+    }
+
     // Create a new model based on loaded dimensions
     // This will allocate and initialize with random data, which we will then overwrite
     LegacyLLM* model = create_legacy_llm(vocab_size, model_dim, num_transformer_blocks);
@@ -244,15 +267,31 @@ void initialize_ternary_data(int8_t* data, int size) {
 
 TernaryMatrix create_ternary_matrix(int rows, int cols) {
     TernaryMatrix mat;
-    mat.rows = rows;
-    mat.cols = cols;
-    mat.data = (int8_t*)calloc(rows * cols, sizeof(int8_t));
-    if (mat.data == NULL) {
-        perror("Error allocating memory for TernaryMatrix data");
-        mat.rows = 0;
-        mat.cols = 0;
+    mat.rows = 0;
+    mat.cols = 0;
+    mat.data = NULL;
+    
+    // Validate dimensions
+    if (rows <= 0 || cols <= 0 || rows > 100000 || cols > 100000) {
+        fprintf(stderr, "Error: Invalid TernaryMatrix dimensions %dx%d\n", rows, cols);
         return mat;
     }
+    
+    // Check for integer overflow
+    if (rows > INT_MAX / cols) {
+        fprintf(stderr, "Error: TernaryMatrix size overflow for %dx%d\n", rows, cols);
+        return mat;
+    }
+    
+    size_t total_elements = (size_t)rows * (size_t)cols;
+    mat.data = (int8_t*)calloc(total_elements, sizeof(int8_t));
+    if (mat.data == NULL) {
+        perror("Error allocating memory for TernaryMatrix data");
+        return mat;
+    }
+    
+    mat.rows = rows;
+    mat.cols = cols;
     initialize_ternary_data(mat.data, rows * cols);
     return mat;
 }

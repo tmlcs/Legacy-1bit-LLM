@@ -13,6 +13,29 @@
 #define PAD_TOKEN MAX_VOCAB_SIZE  // Special token for padding, using MAX_VOCAB_SIZE to avoid conflict with actual char codes
 #define LAYER_NORM_EPSILON 1e-5f // Epsilon for layer normalization to prevent division by zero
 
+// --- Error Return Conventions ---
+// This codebase follows these conventions for function return values:
+//
+// POINTER RETURNS (float*, char*, etc.):
+//   - On success: valid pointer (caller must free if dynamically allocated)
+//   - On error:   NULL
+//
+// INTEGER RETURNS (int):
+//   - On success: 1
+//   - On error:   0
+//
+// FLOAT RETURNS (single value, e.g., cross_entropy_loss):
+//   - On success: valid float value >= 0
+//   - On error:   -1.0f
+//
+// VOID FUNCTIONS:
+//   - No return value; errors printed to stderr via fprintf
+//
+// Helper macros for error checking:
+#define IS_SUCCESS(x)  ((x) == 1)
+#define IS_ERROR(x)    ((x) == 0)
+#define IS_PTR_ERROR(x) ((x) == NULL)
+
 // --- Data Structures for Ternary Weights ---
 
 // A simple structure to represent a matrix of int8_t values (for ternary weights)

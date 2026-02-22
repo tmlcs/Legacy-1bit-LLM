@@ -349,6 +349,10 @@ void vector_sub_scalar_inplace(float* vec, float scalar, int size) {
 #ifdef USE_SSE
 // SSE-optimized vector_div_scalar_inplace
 void vector_div_scalar_inplace(float* vec, float scalar, int size) {
+    if (!vec || size <= 0 || scalar == 0.0f) {
+        fprintf(stderr, "Error: NULL, invalid input, or division by zero in vector_div_scalar_inplace\n");
+        return;
+    }
     __m128 s_vec = _mm_set1_ps(scalar); // Splat scalar into all 4 floats of an SSE register
     int i;
     for (i = 0; i + 3 < size; i += 4) {
@@ -364,6 +368,10 @@ void vector_div_scalar_inplace(float* vec, float scalar, int size) {
 #else
 // Non-SSE vector_div_scalar_inplace
 void vector_div_scalar_inplace(float* vec, float scalar, int size) {
+    if (!vec || size <= 0 || scalar == 0.0f) {
+        fprintf(stderr, "Error: NULL, invalid input, or division by zero in vector_div_scalar_inplace\n");
+        return;
+    }
     for (int i = 0; i < size; ++i) {
         vec[i] /= scalar;
     }
@@ -472,6 +480,11 @@ void relu(float* input, int size) {
 #ifdef USE_SSE
 void softmax(float* input, int size) {
     START_TIMER(softmax_sse);
+    if (!input || size <= 0) {
+        fprintf(stderr, "Error: NULL or invalid input to softmax\n");
+        STOP_TIMER(softmax_sse, "softmax_sse");
+        return;
+    }
     // 1. Find max_val for numerical stability (partially SSE-optimized)
     float max_val = input[0];
     int i;
@@ -530,6 +543,11 @@ void softmax(float* input, int size) {
 #else
 void softmax(float* input, int size) {
     START_TIMER(softmax_non_sse);
+    if (!input || size <= 0) {
+        fprintf(stderr, "Error: NULL or invalid input to softmax\n");
+        STOP_TIMER(softmax_non_sse, "softmax_non_sse");
+        return;
+    }
     float max_val = input[0];
     for (int i = 0; i < size; ++i) {
         if (input[i] > max_val) {
@@ -554,6 +572,11 @@ void softmax(float* input, int size) {
 #ifdef USE_SSE
 void layer_norm_forward(float* input, const float* gamma, const float* beta, int size, float epsilon, float* out_mean, float* out_inv_std_dev) {
     START_TIMER(layer_norm_forward_sse);
+    if (!input || !gamma || !beta || size <= 0) {
+        fprintf(stderr, "Error: NULL or invalid input to layer_norm_forward\n");
+        STOP_TIMER(layer_norm_forward_sse, "layer_norm_forward_sse");
+        return;
+    }
     // 1. Calculate mean (partially SSE-optimized)
     __m128 sum_vec = _mm_setzero_ps();
     int i;
@@ -622,6 +645,11 @@ void layer_norm_forward(float* input, const float* gamma, const float* beta, int
 #else
 void layer_norm_forward(float* input, const float* gamma, const float* beta, int size, float epsilon, float* out_mean, float* out_inv_std_dev) {
     START_TIMER(layer_norm_forward_non_sse);
+    if (!input || !gamma || !beta || size <= 0) {
+        fprintf(stderr, "Error: NULL or invalid input to layer_norm_forward\n");
+        STOP_TIMER(layer_norm_forward_non_sse, "layer_norm_forward_non_sse");
+        return;
+    }
     float mean = 0.0f;
     for (int i = 0; i < size; ++i) {
         mean += input[i];

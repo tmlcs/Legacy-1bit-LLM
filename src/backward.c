@@ -571,7 +571,15 @@ float* backward_transformer_block(const TransformerBlock* block, const float* d_
 
     // Gradients for FFN (and its residual connection)
     float* d_loss_d_ffn_output_for_ffn_back = create_float_array(model_dim);
-    if (!d_loss_d_ffn_output_for_ffn_back) { free_float_array(d_loss_d_current_output); return NULL; }
+    if (!d_loss_d_ffn_output_for_ffn_back) {
+        free_float_array(norm1_output_buffer_recomputed);
+        free_float_array(attn_output_recomputed);
+        free_float_array(current_output_after_attn_residual_recomputed);
+        free_float_array(norm2_output_buffer_recomputed);
+        free_float_array(ffn_output_recomputed);
+        free_float_array(d_loss_d_current_output);
+        return NULL;
+    }
     memcpy(d_loss_d_ffn_output_for_ffn_back, d_loss_d_current_output, model_dim * sizeof(float));
     
     // Recomputed inputs to backward_feed_forward
@@ -969,7 +977,12 @@ void backward_llm_batch(LegacyLLM* model, const int* input_batch, const int* tar
 
             float* d_loss_d_ffn_output_for_ffn_back = create_float_array(model_dim);
 
-            if (!d_loss_d_ffn_output_for_ffn_back) { free_float_array(d_loss_d_current_output); free_float_array(d_loss_d_block_input_batch); return NULL; }
+            if (!d_loss_d_ffn_output_for_ffn_back) {
+                free_float_array(norm1_output_buffer_recomputed); free_float_array(attn_output_recomputed);
+                free_float_array(current_output_after_attn_residual_recomputed); free_float_array(norm2_output_buffer_recomputed);
+                free_float_array(ffn_output_recomputed); free_float_array(d_loss_d_current_output); free_float_array(d_loss_d_block_input_batch);
+                return NULL;
+            }
 
             memcpy(d_loss_d_ffn_output_for_ffn_back, d_loss_d_current_output, model_dim * sizeof(float));
 
@@ -980,9 +993,11 @@ void backward_llm_batch(LegacyLLM* model, const int* input_batch, const int* tar
             float* hidden_pre_relu_output_recomputed_single = create_float_array(model_dim * FFN_DIM_MULTIPLIER);
 
             if (!hidden_pre_relu_output_recomputed_single) {
-
-                free_float_array(d_loss_d_ffn_output_for_ffn_back); free_float_array(d_loss_d_current_output); free_float_array(d_loss_d_block_input_batch); return NULL;
-
+                free_float_array(norm1_output_buffer_recomputed); free_float_array(attn_output_recomputed);
+                free_float_array(current_output_after_attn_residual_recomputed); free_float_array(norm2_output_buffer_recomputed);
+                free_float_array(ffn_output_recomputed); free_float_array(d_loss_d_ffn_output_for_ffn_back);
+                free_float_array(d_loss_d_current_output); free_float_array(d_loss_d_block_input_batch);
+                return NULL;
             }
 
             ternary_matrix_vector_mul(&block->ffn.Wi, ffn_input_recomputed_single, hidden_pre_relu_output_recomputed_single);
@@ -997,7 +1012,12 @@ void backward_llm_batch(LegacyLLM* model, const int* input_batch, const int* tar
 
             free_float_array(hidden_pre_relu_output_recomputed_single);
 
-            if (!d_loss_d_norm2_output) { free_float_array(d_loss_d_current_output); free_float_array(d_loss_d_block_input_batch); return NULL; }
+            if (!d_loss_d_norm2_output) {
+                free_float_array(norm1_output_buffer_recomputed); free_float_array(attn_output_recomputed);
+                free_float_array(current_output_after_attn_residual_recomputed); free_float_array(norm2_output_buffer_recomputed);
+                free_float_array(ffn_output_recomputed); free_float_array(d_loss_d_current_output); free_float_array(d_loss_d_block_input_batch);
+                return NULL;
+            }
 
     
 
@@ -1011,7 +1031,12 @@ void backward_llm_batch(LegacyLLM* model, const int* input_batch, const int* tar
 
             free_float_array(d_loss_d_current_output);
 
-            if (!d_loss_d_block_output_before_ffn_residual) { free_float_array(d_loss_d_block_input_batch); return NULL; }
+            if (!d_loss_d_block_output_before_ffn_residual) {
+                free_float_array(norm1_output_buffer_recomputed); free_float_array(attn_output_recomputed);
+                free_float_array(current_output_after_attn_residual_recomputed); free_float_array(norm2_output_buffer_recomputed);
+                free_float_array(ffn_output_recomputed); free_float_array(d_loss_d_block_input_batch);
+                return NULL;
+            }
 
     
 
@@ -1019,7 +1044,13 @@ void backward_llm_batch(LegacyLLM* model, const int* input_batch, const int* tar
 
             float* d_loss_d_attn_output_for_mha_back = create_float_array(model_dim);
 
-            if (!d_loss_d_attn_output_for_mha_back) { free_float_array(d_loss_d_block_output_before_ffn_residual); free_float_array(d_loss_d_block_input_batch); return NULL; }
+            if (!d_loss_d_attn_output_for_mha_back) {
+                free_float_array(norm1_output_buffer_recomputed); free_float_array(attn_output_recomputed);
+                free_float_array(current_output_after_attn_residual_recomputed); free_float_array(norm2_output_buffer_recomputed);
+                free_float_array(ffn_output_recomputed); free_float_array(d_loss_d_block_output_before_ffn_residual);
+                free_float_array(d_loss_d_block_input_batch);
+                return NULL;
+            }
 
             memcpy(d_loss_d_attn_output_for_mha_back, d_loss_d_block_output_before_ffn_residual, model_dim * sizeof(float));
 
@@ -1054,6 +1085,9 @@ void backward_llm_batch(LegacyLLM* model, const int* input_batch, const int* tar
                 free_float_array(recomputed_query_vec_pre_bias); free_float_array(recomputed_key_vec_pre_bias); free_float_array(recomputed_value_vec_pre_bias);
 
                 free_float_array(recomputed_query_vec); free_float_array(recomputed_key_vec); free_float_array(recomputed_value_vec); free_float_array(recomputed_attention_output_vec);
+                free_float_array(norm1_output_buffer_recomputed); free_float_array(attn_output_recomputed);
+                free_float_array(current_output_after_attn_residual_recomputed); free_float_array(norm2_output_buffer_recomputed);
+                free_float_array(ffn_output_recomputed);
 
                 free_float_array(d_loss_d_attn_output_for_mha_back); free_float_array(d_loss_d_block_output_before_ffn_residual); free_float_array(d_loss_d_block_input_batch); return NULL;
 
@@ -1105,7 +1139,13 @@ void backward_llm_batch(LegacyLLM* model, const int* input_batch, const int* tar
 
     
 
-            if (!d_loss_d_norm1_output) { free_float_array(d_loss_d_block_output_before_ffn_residual); free_float_array(d_loss_d_block_input_batch); return NULL; }
+            if (!d_loss_d_norm1_output) {
+                free_float_array(norm1_output_buffer_recomputed); free_float_array(attn_output_recomputed);
+                free_float_array(current_output_after_attn_residual_recomputed); free_float_array(norm2_output_buffer_recomputed);
+                free_float_array(ffn_output_recomputed); free_float_array(d_loss_d_block_output_before_ffn_residual);
+                free_float_array(d_loss_d_block_input_batch);
+                return NULL;
+            }
 
             
 

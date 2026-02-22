@@ -17,6 +17,11 @@ Logger* logger_init(const char* log_dir, float learning_rate) {
     char timestamp[64];
     time_t now = time(NULL);
     struct tm* tm_info = localtime(&now);
+    if (!tm_info) {
+        fprintf(stderr, "Error: localtime() failed\n");
+        free(logger);
+        return NULL;
+    }
     strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", tm_info);
     
     snprintf(filename, sizeof(filename), "%s/training_%s.json", 
@@ -101,5 +106,9 @@ void logger_log_batch(Logger* logger, int epoch, int batch, float loss,
 void logger_get_timestamp(char* buffer, size_t buffer_size) {
     time_t now = time(NULL);
     struct tm* tm_info = localtime(&now);
+    if (!tm_info) {
+        snprintf(buffer, buffer_size, "0000-00-00 00:00:00");
+        return;
+    }
     strftime(buffer, buffer_size, "%Y-%m-%d %H:%M:%S", tm_info);
 }

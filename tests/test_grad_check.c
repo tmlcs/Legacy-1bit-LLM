@@ -16,13 +16,11 @@
 
 // Helper function to compute loss for a given model state
 float compute_loss(LegacyLLM* model, int input_token, int target_token) {
-    LLM_Forward_Output* forward_output = forward_llm(model, input_token);
-    if (!forward_output) {
+    float* probs = forward_llm(model, input_token);
+    if (!probs) {
         fprintf(stderr, "DEBUG(compute_loss): forward_llm failed.\n");
-        return -1.0f; // Indicate error
+        return -1.0f;
     }
-    // For batch_size=1, the predicted probabilities are at the beginning of the batch
-    float* probs = forward_output->predicted_probs_batch;
 
     fprintf(stderr, "DEBUG(compute_loss): input_token=%d, target_token=%d\n", input_token, target_token);
     fprintf(stderr, "DEBUG(compute_loss): Predicted Probs for true_token_id (%d): %.8f\n", target_token, probs[target_token]);
@@ -33,7 +31,7 @@ float compute_loss(LegacyLLM* model, int input_token, int target_token) {
     float loss = cross_entropy_loss(probs, target_token, model->vocab_size);
     fprintf(stderr, "DEBUG(compute_loss): Computed Loss: %.8f\n", loss);
     
-    free_llm_forward_output(forward_output); // Free the structure and its contents
+    free_float_array(probs);
     return loss;
 }
 
@@ -138,15 +136,15 @@ int main() {
     // 1. Calculate analytical gradients first
     printf("Calculating analytical gradients...\n");
     zero_legacy_llm_gradients(grads);
-    LLM_Forward_Output* analytical_forward_output = forward_llm(model, input_token);
-    if (!analytical_forward_output) {
+    float* analytical_probs = forward_llm(model, input_token);
+    if (!analytical_probs) {
         fprintf(stderr, "Error during analytical forward pass for gradient check.\n");
         free_legacy_llm_gradients(grads);
         free_legacy_llm(model);
         return 1;
     }
+    free_float_array(analytical_probs);
     backward_llm(model, input_token, target_token, grads);
-    free_llm_forward_output(analytical_forward_output); // Free the output from the analytical pass
     printf("Analytical gradients calculated.\n\n");
 
     // 2. Perform gradient checking for continuous parameters (biases, layer norm params)

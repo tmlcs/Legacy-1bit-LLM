@@ -43,6 +43,12 @@ float* forward_embedding_batch(const EmbeddingLayer* layer, const int* input_bat
         fprintf(stderr, "Error: Invalid input to forward_embedding_batch\n");
         return NULL;
     }
+    
+    // Validate model_dim matches embedding weights columns
+    if (model_dim != layer->embedding_weights.cols) {
+        fprintf(stderr, "Error: model_dim (%d) != embedding_weights.cols (%d)\n", model_dim, layer->embedding_weights.cols);
+        return NULL;
+    }
 
     // Allocate memory for the output batch of embeddings.
     // This will be a flattened array where embeddings for each token are concatenated.

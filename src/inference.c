@@ -3,6 +3,7 @@
 #include <string.h>
 #include <time.h>
 #include <math.h>
+#include <limits.h>
 
 #include "legacy_llm.h"
 #include "data_utils.h"
@@ -44,7 +45,11 @@ static int sample_token(float* probs, int vocab_size, const GenerationConfig* co
     }
     else if (config->strategy == SAMPLING_TEMPERATURE) {
         // Temperature sampling: apply temperature and sample
-        float scaled_probs[256]; // Assuming vocab_size <= 256
+        float* scaled_probs = (float*)malloc(vocab_size * sizeof(float));
+        if (!scaled_probs) {
+            fprintf(stderr, "Error: Memory allocation failed in temperature sampling\n");
+            return 0;
+        }
         float sum = 0.0f;
         
         for (int i = 0; i < vocab_size; i++) {
@@ -65,13 +70,16 @@ static int sample_token(float* probs, int vocab_size, const GenerationConfig* co
         // Sample from distribution
         float r = (float)rand() / (float)RAND_MAX;
         float cumsum = 0.0f;
+        int result = vocab_size - 1;
         for (int i = 0; i < vocab_size; i++) {
             cumsum += scaled_probs[i];
             if (r <= cumsum) {
-                return i;
+                result = i;
+                break;
             }
         }
-        return vocab_size - 1;
+        free(scaled_probs);
+        return result;
     }
     else if (config->strategy == SAMPLING_TOP_K) {
         // Top-k sampling: sample only from top k tokens
@@ -80,7 +88,12 @@ static int sample_token(float* probs, int vocab_size, const GenerationConfig* co
             float prob;
         } TokenProb;
         
-        TokenProb tokens[256];
+        TokenProb* tokens = (TokenProb*)malloc(vocab_size * sizeof(TokenProb));
+        if (!tokens) {
+            fprintf(stderr, "Error: Memory allocation failed in top-k sampling\n");
+            return 0;
+        }
+        
         for (int i = 0; i < vocab_size; i++) {
             tokens[i].token = i;
             tokens[i].prob = probs[i];
@@ -107,13 +120,16 @@ static int sample_token(float* probs, int vocab_size, const GenerationConfig* co
         // Sample from top-k
         float r = (float)rand() / (float)RAND_MAX * sum;
         float cumsum = 0.0f;
+        int result = tokens[k-1].token;
         for (int i = 0; i < k; i++) {
             cumsum += tokens[i].prob;
             if (r <= cumsum) {
-                return tokens[i].token;
+                result = tokens[i].token;
+                break;
             }
         }
-        return tokens[k-1].token;
+        free(tokens);
+        return result;
     }
     
     return 0; // Fallback
@@ -128,14 +144,22 @@ static void generate_text(LegacyLLM* model, const char* prompt, const Generation
     fflush(stdout);
     
     // Tokenize prompt
-    int prompt_length = strlen(prompt);
+    size_t prompt_length = strlen(prompt);
+    if (prompt_length == 0 || prompt_length > INT_MAX) {
+        printf("\nError: Invalid prompt length.\n");
+        return;
+    }
     int* input_tokens = (int*)malloc(prompt_length * sizeof(int));
+    if (!input_tokens) {
+        printf("\nError: Memory allocation failed.\n");
+        return;
+    }
     int num_tokens = 0;
     
-    for (int i = 0; i < prompt_length && prompt[i] != '\0'; i++) {
+    for (size_t i = 0; i < prompt_length && prompt[i] != '\0'; i++) {
         unsigned char c = (unsigned char)prompt[i];
-        if (c < vocab_size) {
-            input_tokens[num_tokens++] = c;
+        if (c < (unsigned int)vocab_size) {
+            input_tokens[num_tokens++] = (int)c;
         }
     }
     

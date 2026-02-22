@@ -27,6 +27,12 @@ DatasetStream* dataset_stream_init(const char* filepath, int vocab_size,
     fseek(stream->file, 0, SEEK_SET);
     
     stream->filepath = strdup(filepath);
+    if (!stream->filepath) {
+        fprintf(stderr, "Error: Failed to duplicate filepath\n");
+        fclose(stream->file);
+        free(stream);
+        return NULL;
+    }
     stream->current_position = 0;
     stream->vocab_size = vocab_size;
     stream->chunk_size = chunk_size > 0 ? chunk_size : 8192; // Default 8KB chunks
@@ -243,6 +249,15 @@ char* augment_text(const char* text, float swap_prob, float delete_prob) {
     (void)swap_prob;
     (void)delete_prob;
     
+    if (!text) {
+        fprintf(stderr, "Error: NULL text passed to augment_text\n");
+        return NULL;
+    }
+    
     // For now, return copy of original
-    return strdup(text);
+    char* result = strdup(text);
+    if (!result) {
+        fprintf(stderr, "Error: Memory allocation failed in augment_text\n");
+    }
+    return result;
 }
